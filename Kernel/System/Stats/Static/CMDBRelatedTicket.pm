@@ -196,6 +196,9 @@ sub Run {
 	my $LinkObject = $Kernel::OM->Get('Kernel::System::LinkObject');
 	#my @Data;
 	
+	my @All;
+	my @Linked;
+	
     foreach my $TicketID (@TicketIDs)
     {
         my %LinkKeyList = $LinkObject->LinkKeyListWithData(
@@ -227,17 +230,54 @@ sub Run {
 			);
 			
 			return if !$Success;	
-			
+			push @Linked, $SubItemID->{ConfigItemID};
         }
         
          
     }
 	
+	#total linked cmdb
+	my $Total = scalar @Linked;
+	
+	my $ConfigItemObject = $Kernel::OM->Get('Kernel::System::ITSMConfigItem');
+	#search all config item in the same class
+	my $AllConfigItemIDs = $ConfigItemObject->ConfigItemSearchExtended(
+        ClassIDs     => [$ClassID],             # (optional)
+    );
+ 
+	foreach my $ConfigItemID (@{$AllConfigItemIDs})
+    {
+		push @All, $ConfigItemID;  
+    } 
+	
+	use Array::Utils qw(:all);
+	# get unique value from two compared array. To get not linked CMDB item
+	my @diff = array_diff(@All, @Linked);
+	
+	for my $unique (@diff)
+	{
+		my $VersionRef = $ConfigItemObject->VersionGet(
+			ConfigItemID => $unique,
+			XMLDataGet   => 0,
+		);
+		
+		##Put the result from api to db tmp table
+		my $Success2 = $DBObject->Do(
+			SQL => "INSERT INTO $DBTable1 "
+			. "(ci_class, ci_number, ci_name) "
+				. "VALUES (?, ?, ?)",
+			Bind => [ \$VersionRef->{Class}, \$VersionRef->{Number}, \$VersionRef->{Name} ],
+		);
+		
+		return if !$Success2;	
+		
+	}
+	
 	my @Stats1 = ();
 	my $Title = "CMDB Related Ticket From $ForYear-$FromMonth To $ForYear-$ToMonth";
 	
-	###MYSQL select all..
-	my $SQL1 = "SELECT * FROM $DBTable1	ORDER BY ci_number";
+	###MYSQL select all linked cmdb..
+	my $SQL1 = "SELECT * FROM $DBTable1	WHERE ticket_number IS NOT NULL ORDER BY ci_number";
 	$DBObject->Prepare( SQL => $SQL1);
 	my @HeadData1 = $DBObject->GetColumnNames();
 	$_ = uc for @HeadData1;
@@ -256,22 +296,14 @@ sub Run {
 	}
 	####################
 	
-	###MYSQL get count and percent, etc..
+	###MYSQL select not linked cmdb..
 	my @Stats2 = ();
-	my $SQL2 = "
-	SELECT ci_name AS 'CI_NAME',
-	COUNT(ci_number) AS 'FREQUENCY',
-	CONCAT(FORMAT(COUNT(ci_number) / $count1 * 100,2),'%') AS 'PERCENTAGE'
-	FROM $DBTable1 
-	GROUP BY ci_number
-	";
-
-	
+	my $SQL2 = "SELECT ci_class, ci_number, ci_name FROM $DBTable1	WHERE ticket_number IS NULL ORDER BY ci_number";
 	
 	$DBObject->Prepare( SQL => $SQL2);
 	my @HeadData2 = $DBObject->GetColumnNames();
 	$_ = uc for @HeadData2;
-	push @Stats2, ['EFFECTED ITEM FREQUENCY'];
+	push @Stats2, ['NOT LINKED ITEM'];
 	push @Stats2, [@HeadData2];
 	
 	my $count2 = 0;
@@ -286,6 +318,35 @@ sub Run {
 	}
 	
 	#############################################################
+	
+	###MYSQL get count and percent, etc..
+	my @Stats3 = ();
+	my $SQL3 = "
+	SELECT ci_name AS 'CI_NAME',
+	COUNT(ticket_number) AS 'FREQUENCY',
+	CONCAT(FORMAT(COUNT(ticket_number) / $Total * 100,2),'%') AS 'PERCENTAGE'
+	FROM $DBTable1 
+	GROUP BY ci_number
+	";
+	
+	$DBObject->Prepare( SQL => $SQL3);
+	my @HeadData3 = $DBObject->GetColumnNames();
+	$_ = uc for @HeadData3;
+	push @Stats3, ['EFFECTED ITEM FREQUENCY'];
+	push @Stats3, [@HeadData3];
+	
+	my $count3 = 0;
+    while ( my @Row3 = $DBObject->FetchrowArray() ) {
+		push @Stats3, \@Row3;
+		$count3++;
+    }
+	
+	unless ($count3) {
+	my @NODATA3 = "Sorry 0 Result" ;
+	push @Stats3, \@NODATA3;
+	}
+	
+	#############################################################
 		
 	#DROP TEMP TABLE
 	$DBObject->Do( SQL => $SQLDROP1);
@@ -294,7 +355,7 @@ sub Run {
 	push @DataEmptyLine, [ '' ];
   
 	
-	return ( [$Title],  [$Title], @DataEmptyLine, [@HeadData1], @Stats1, @DataEmptyLine, @DataEmptyLine, @Stats2 );
+	return ( [$Title],  [$Title], @DataEmptyLine, [@HeadData1], @Stats1, @DataEmptyLine, @DataEmptyLine, @Stats2,  @DataEmptyLine, @DataEmptyLine, @Stats3 );
 		
 }
 

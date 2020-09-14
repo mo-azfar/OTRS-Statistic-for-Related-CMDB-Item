@@ -4,5 +4,11 @@
 
 *This statistic module display all related CMDB Config Item which are linked to the ticket.  
 
-[![ci1.png](https://i.postimg.cc/HnyT92JX/ci1.png)](https://postimg.cc/YLtcpQzC)  
+
+		Used CPAN module:
+
+		Array::Utils
+		
+
+[![ci1.png](https://i.postimg.cc/8z205y9r/ci1.png)](https://postimg.cc/LJVTQVHH)
 
