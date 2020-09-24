@@ -1,4 +1,8 @@
 # OTRS-Statistic-for-Related-CMDB-Item
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://paypal.me/MohdAzfar?locale.x=en_US)  
+
+
 - For OTRS CE v6  
 - Extend OTRS static stats for CMDB Config Item which are connected to the ticket.  
 - Purpose: so you can see the most effected asset item in a month / year. Help the management to make the decision either to fix or totally replcaing the item.  
