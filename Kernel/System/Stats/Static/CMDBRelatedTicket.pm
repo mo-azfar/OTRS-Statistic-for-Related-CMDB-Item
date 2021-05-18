@@ -250,6 +250,7 @@ sub Run {
 		push @All, $ConfigItemID;  
     } 
 	
+	# cpan Array::Utils				
 	use Array::Utils qw(:all);
 	# get unique value from two compared array. To get not linked CMDB item
 	my @diff = array_diff(@All, @Linked);
